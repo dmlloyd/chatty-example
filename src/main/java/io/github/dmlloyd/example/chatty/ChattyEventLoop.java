@@ -13,10 +13,10 @@ import org.jboss.threads.virtual.EventLoop;
 final class ChattyEventLoop extends EventLoop {
     private final Selector selector;
     private final Consumer<SelectionKey> handleEvent = this::handleEvent;
-    private final Executor ioThreadExecutor;
+    private final Executor eventLoopExecutor;
 
-    ChattyEventLoop(Executor ioThreadExecutor) {
-        this.ioThreadExecutor = ioThreadExecutor;
+    ChattyEventLoop(Executor eventLoopExecutor) {
+        this.eventLoopExecutor = eventLoopExecutor;
         try {
             selector = Selector.open();
         } catch (IOException e) {
@@ -28,8 +28,8 @@ final class ChattyEventLoop extends EventLoop {
         return selector;
     }
 
-    Executor ioThreadExecutor() {
-        return ioThreadExecutor;
+    Executor eventLoopExecutor() {
+        return eventLoopExecutor;
     }
 
     protected void unparkAny(final long waitTime) {

@@ -8,6 +8,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.locks.LockSupport;
 
+import org.jboss.threads.virtual.EventLoopThread;
+
 final class ChattyOutputStream extends OutputStream {
     private final WritableByteChannel channel;
     private final SelectionKey key;
@@ -72,8 +74,10 @@ final class ChattyOutputStream extends OutputStream {
         Thread[] threads = (Thread[]) key.attachment();
         threads[Chatty.IDX_WRITE] = Thread.currentThread();
         key.interestOpsOr(SelectionKey.OP_WRITE);
-        // todo: ping the selector thread nicely...?
-        key.selector().wakeup();
+        if (EventLoopThread.current() == null) {
+            // not on an event loop; ping the selector
+            key.selector().wakeup();
+        }
         LockSupport.park(this);
         key.interestOpsAnd(~SelectionKey.OP_WRITE);
         threads[Chatty.IDX_WRITE] = null;

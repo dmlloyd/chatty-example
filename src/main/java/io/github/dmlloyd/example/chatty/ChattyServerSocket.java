@@ -8,25 +8,26 @@ import java.io.OutputStream;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.Executor;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 
-import org.jboss.threads.virtual.Scheduler;
+import org.jboss.threads.virtual.EventLoopThread;
 
 final class ChattyServerSocket {
-    private final Scheduler scheduler;
+    private final Executor executor;
     private final ServerSocketChannel channel;
     private final SelectionKey key;
 
-    ChattyServerSocket(final Scheduler scheduler, final ServerSocketChannel channel, final SelectionKey key) {
-        this.scheduler = scheduler;
+    ChattyServerSocket(final Executor executor, final ServerSocketChannel channel, final SelectionKey key) {
+        this.executor = executor;
         this.channel = channel;
         this.key = key;
     }
 
     public void accept(BiConsumer<InputStream, OutputStream> handler) throws IOException {
         SocketChannel accepted = acceptBlocking();
-        scheduler.execute(() -> {
+        executor.execute(() -> {
             try {
                 accepted.configureBlocking(false);
                 SelectionKey key = accepted.register(this.key.selector(), 0, new Thread[2]);
@@ -46,8 +47,10 @@ final class ChattyServerSocket {
             Thread[] threads = (Thread[]) key.attachment();
             threads[Chatty.IDX_READ] = Thread.currentThread();
             key.interestOpsOr(SelectionKey.OP_ACCEPT);
-            // todo: ping the selector thread nicely...?
-            key.selector().wakeup();
+            if (EventLoopThread.current() == null) {
+                // not on an event loop; ping the selector
+                key.selector().wakeup();
+            }
             LockSupport.park(this);
             key.interestOpsAnd(~SelectionKey.OP_ACCEPT);
             threads[Chatty.IDX_READ] = null;

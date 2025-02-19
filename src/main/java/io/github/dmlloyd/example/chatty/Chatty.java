@@ -14,10 +14,12 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import io.smallrye.common.net.Inet;
 import org.jboss.threads.EnhancedQueueExecutor;
+import org.jboss.threads.virtual.EventLoopThread;
 import org.jboss.threads.virtual.Scheduler;
 
 /**
@@ -29,9 +31,10 @@ public final class Chatty {
 
     public static void main(String[] args) {
         EnhancedQueueExecutor eqe = new EnhancedQueueExecutor.Builder().build();
-        Scheduler scheduler = Scheduler.create(eqe, ChattyEventLoop::new);
-        ChattyEventLoop el = (ChattyEventLoop) scheduler.allEventLoops().findFirst().orElseThrow();
-        el.ioThreadExecutor().execute(new Server(scheduler));
+        Scheduler scheduler = Scheduler.create(eqe);
+        EventLoopThread elt = scheduler.newEventLoopThread(ChattyEventLoop::new);
+        ChattyEventLoop el = (ChattyEventLoop) elt.eventLoop();
+        el.eventLoopExecutor().execute(new Server(el, el.eventLoopExecutor()));
         for (;;) {
             try {
                 Thread.sleep(3_000L);
@@ -46,10 +49,12 @@ public final class Chatty {
 
         private static final String TOMBSTONE = "Tombstone!";
         private final Set<LinkedBlockingQueue<String>> subscribers = ConcurrentHashMap.newKeySet();
-        private final Scheduler scheduler;
+        private final ChattyEventLoop eventLoop;
+        private final Executor executor;
 
-        Server(final Scheduler scheduler) {
-            this.scheduler = scheduler;
+        Server(final ChattyEventLoop eventLoop, final Executor executor) {
+            this.eventLoop = eventLoop;
+            this.executor = executor;
         }
 
         public void run() {
@@ -57,10 +62,9 @@ public final class Chatty {
                 ServerSocketChannel server = ServerSocketChannel.open(StandardProtocolFamily.INET6);
                 server.configureBlocking(false);
                 server.bind(new InetSocketAddress(Inet.INET4_ANY, 42424));
-                ChattyEventLoop eventLoop = (ChattyEventLoop) scheduler.eventLoop();
                 Selector sel = eventLoop.selector();
                 SelectionKey key = server.register(sel, SelectionKey.OP_ACCEPT, new Thread[1]);
-                ChattyServerSocket css = new ChattyServerSocket(scheduler, server, key);
+                ChattyServerSocket css = new ChattyServerSocket(executor, server, key);
                 for (;;) {
                     css.accept(this::runThread);
                 }
@@ -102,7 +106,7 @@ public final class Chatty {
                             subscribers.add(q);
                             try {
                                 final String finalName = name;
-                                scheduler.execute(() -> {
+                                executor.execute(() -> {
                                     // take user input and put it into the chat queue
                                     try {
                                         for (; ; ) {

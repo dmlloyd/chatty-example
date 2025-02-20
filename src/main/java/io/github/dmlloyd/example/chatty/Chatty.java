@@ -34,7 +34,7 @@ public final class Chatty {
         Scheduler scheduler = Scheduler.create(eqe);
         EventLoopThread elt = scheduler.newEventLoopThread(ChattyEventLoop::new);
         ChattyEventLoop el = (ChattyEventLoop) elt.eventLoop();
-        el.eventLoopExecutor().execute(new Server(el, el.eventLoopExecutor()));
+        el.eventLoopExecutor().execute(new Server(el, elt.newPool()));
         for (;;) {
             try {
                 Thread.sleep(3_000L);

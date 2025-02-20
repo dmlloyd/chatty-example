@@ -9,6 +9,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 
 import org.jboss.threads.virtual.EventLoop;
+import org.jboss.threads.virtual.Scheduler;
 
 final class ChattyEventLoop extends EventLoop {
     private final Selector selector;
@@ -45,7 +46,7 @@ final class ChattyEventLoop extends EventLoop {
             throw new IOError(e);
         }
         // do not wait more than 10 ms (100 Hz) to poll for ready I/O when busy
-        LockSupport.parkNanos(10_000_000L);
+        Scheduler.yieldNanos(10_000_000L);
     }
 
     protected void wakeup() {

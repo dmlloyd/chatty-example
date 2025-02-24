@@ -47,21 +47,19 @@ final class ChattyOutputStream extends OutputStream {
     }
 
     public void flush() throws IOException {
-        flushBytes();
-    }
-
-    private int flushBytes() throws IOException {
+        ByteBuffer buffer = this.buffer;
         if (buffer.position() == 0) {
-            return 0;
+            return;
         }
         buffer.flip();
         try {
-            int res = channel.write(buffer);
-            while (res == 0) {
-                awaitWritable();
-                res = channel.write(buffer);
+            while (buffer.hasRemaining()) {
+                int res = channel.write(buffer);
+                while (res == 0) {
+                    awaitWritable();
+                    res = channel.write(buffer);
+                }
             }
-            return res;
         } finally {
             buffer.compact();
         }

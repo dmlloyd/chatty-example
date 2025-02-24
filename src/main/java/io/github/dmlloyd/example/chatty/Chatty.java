@@ -32,9 +32,9 @@ public final class Chatty {
     public static void main(String[] args) {
         EnhancedQueueExecutor eqe = new EnhancedQueueExecutor.Builder().build();
         Scheduler scheduler = Scheduler.create(eqe);
-        EventLoopThread elt = scheduler.newEventLoopThread(ChattyEventLoop::new);
+        EventLoopThread elt = scheduler.newEventLoopThread(new ChattyEventLoop());
         ChattyEventLoop el = (ChattyEventLoop) elt.eventLoop();
-        el.eventLoopExecutor().execute(new Server(el, elt.newPool()));
+        elt.newPool().execute(new Server(el, elt.newPool()));
         for (;;) {
             try {
                 Thread.sleep(3_000L);
@@ -43,7 +43,6 @@ public final class Chatty {
             }
         }
     }
-
 
     static class Server implements Runnable {
 
@@ -81,15 +80,12 @@ public final class Chatty {
                             pw.print("Welcome to Chatty! Please enter your name.\r\n");
                             pw.flush();
                             String name;
-                            for (;;) {
+                            do {
                                 name = br.readLine();
                                 if (name == null) {
                                     return;
                                 }
-                                if (! name.isEmpty()) {
-                                    break;
-                                }
-                            }
+                            } while (name.isEmpty());
                             pw.printf("Hello, %s! Start chatting!\r\n", name);
                             pw.flush();
                             final LinkedBlockingQueue<String> q = new LinkedBlockingQueue<>() {
@@ -122,7 +118,7 @@ public final class Chatty {
                                         }
                                         br.close();
                                         pw.close();
-                                    } catch (IOException e) {
+                                    } catch (IOException ignored) {
                                     } finally {
                                         q.add(TOMBSTONE);
                                     }

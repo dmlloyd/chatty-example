@@ -4,20 +4,17 @@ import java.io.IOError;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.util.concurrent.Executor;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 
 import org.jboss.threads.virtual.EventLoop;
-import org.jboss.threads.virtual.Scheduler;
+import org.jboss.threads.virtual.VirtualThreads;
 
 final class ChattyEventLoop extends EventLoop {
     private final Selector selector;
     private final Consumer<SelectionKey> handleEvent = this::handleEvent;
-    private final Executor eventLoopExecutor;
 
-    ChattyEventLoop(Executor eventLoopExecutor) {
-        this.eventLoopExecutor = eventLoopExecutor;
+    ChattyEventLoop() {
         try {
             selector = Selector.open();
         } catch (IOException e) {
@@ -27,10 +24,6 @@ final class ChattyEventLoop extends EventLoop {
 
     Selector selector() {
         return selector;
-    }
-
-    Executor eventLoopExecutor() {
-        return eventLoopExecutor;
     }
 
     protected void unparkAny(final long waitTime) {
@@ -46,7 +39,7 @@ final class ChattyEventLoop extends EventLoop {
             throw new IOError(e);
         }
         // do not wait more than 10 ms (100 Hz) to poll for ready I/O when busy
-        Scheduler.yieldNanos(10_000_000L);
+        VirtualThreads.yieldNanos(10_000_000L);
     }
 
     protected void wakeup() {
